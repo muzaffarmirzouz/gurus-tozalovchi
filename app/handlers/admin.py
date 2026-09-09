@@ -1,14 +1,20 @@
 """Guruh adminlari uchun sozlash buyruqlari."""
 
+import asyncio
+
 from aiogram import Router, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from aiogram.enums import ChatMemberStatus, ChatType
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 from app import database as db
 
 router = Router()
+
+# Agar shaxsiy xabar yuborib bo'lmasa, guruhdagi javob shuncha soniyadan
+# so'ng avtomatik o'chib ketadi (boshqa a'zolar uzoq ko'rmasligi uchun)
+_GROUP_FALLBACK_TTL = 20
 
 
 async def _require_admin(message: Message) -> bool:
@@ -45,6 +51,40 @@ async def _hide_command(message: Message):
         pass
 
 
+async def _schedule_delete(message: Message, delay: int):
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+
+async def _reply_privately(message: Message, text: str):
+    """Buyruq natijasini boshqa guruh a'zolari ko'rmasligi uchun, iloji
+    boricha adminning shaxsiy (bot bilan) chatiga yuboradi. Agar bu
+    mumkin bo'lmasa (admin botga hali /start bosmagan yoki anonim admin
+    sifatida yozgan bo'lsa), guruhda vaqtinchalik ko'rsatib, bir necha
+    soniyadan so'ng avtomatik o'chirib yuboradi."""
+    can_dm = message.from_user is not None and not message.from_user.is_bot
+    if can_dm:
+        try:
+            await message.bot.send_message(message.from_user.id, text)
+            notice = await message.answer(
+                "✅ Javob sizga shaxsiy xabar qilib yuborildi."
+            )
+            asyncio.create_task(_schedule_delete(notice, 8))
+            return
+        except (TelegramForbiddenError, TelegramBadRequest):
+            pass  # DM ishlamadi - pastda guruhga vaqtinchalik yuboramiz
+
+    sent = await message.answer(
+        text + "\n\n⏳ Bu xabar tez orada avtomatik o'chib ketadi.\n"
+        "Keyingi safar shaxsiy xabar orqali javob olish uchun botga "
+        "shaxsiy chatda /start bosing."
+    )
+    asyncio.create_task(_schedule_delete(sent, _GROUP_FALLBACK_TTL))
+
+
 @router.message(Command("start"), F.chat.type == ChatType.PRIVATE)
 async def cmd_start(message: Message):
     await message.answer(
@@ -63,9 +103,11 @@ async def cmd_start(message: Message):
         "Bot avtomatik ravishda quyidagilarni ham bajaradi:\n"
         "— guruhga a'zo qo'shilgani/chiqib ketgani haqidagi xabarlarni yashiradi\n"
         "— admin yuborgan sozlash buyruqlarini guruh a'zolaridan yashiradi\n"
+        "— buyruq natijasini imkon qadar shaxsiy xabar qilib yuboradi\n"
         "— telefon raqami yozilgan yoki ulashilgan xabarlarni o'chiradi\n\n"
         "Diqqat: majburiy a'zolik ishlashi uchun meni kanalingizga ham "
-        "ADMIN qilib qo'shishingiz kerak."
+        "ADMIN qilib qo'shishingiz kerak. Va shaxsiy javoblarni olish uchun "
+        "hoziroq shu yerga /start bosganingiz kifoya."
     )
 
 
@@ -80,7 +122,7 @@ async def cmd_settings(message: Message):
     def flag(v: bool) -> str:
         return "✅ yoqilgan" if v else "❌ o'chirilgan"
 
-    await message.answer(
+    text = (
         "⚙️ Joriy sozlamalar:\n"
         f"Majburiy kanal: {s['required_channel'] or 'belgilanmagan'}\n"
         f"— majburiy a'zolik: {flag(s['require_subscribe'])}\n"
@@ -91,6 +133,7 @@ async def cmd_settings(message: Message):
         f"Begona botlarni bloklash: {flag(s['block_bots'])}\n"
         f"Qo'shimcha taqiqlangan so'zlar soni: {len(words)}"
     )
+    await _reply_privately(message, text)
 
 
 @router.message(Command("setchannel"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
@@ -103,10 +146,11 @@ async def cmd_setchannel(message: Message, command: CommandObject):
     await _hide_command(message)
     channel = command.args.strip()
     await db.set_required_channel(message.chat.id, channel)
-    await message.answer(
+    await _reply_privately(
+        message,
         f"✅ Majburiy a'zolik kanali {channel} qilib belgilandi.\n"
         f"Eslatma: botni shu kanalga ADMIN qilib qo'shishni unutmang, "
-        f"aks holda a'zolik tekshiruvi ishlamaydi."
+        f"aks holda a'zolik tekshiruvi ishlamaydi.",
     )
 
 
@@ -116,7 +160,7 @@ async def cmd_unsetchannel(message: Message):
         return
     await _hide_command(message)
     await db.set_required_channel(message.chat.id, None)
-    await message.answer("✅ Majburiy a'zolik kanali o'chirildi.")
+    await _reply_privately(message, "✅ Majburiy a'zolik kanali o'chirildi.")
 
 
 _TOGGLE_MAP = {
@@ -145,7 +189,7 @@ async def cmd_toggle(message: Message, command: CommandObject):
     current = await db.get_chat_settings(message.chat.id)
     new_value = not current[field]
     await db.toggle_setting(message.chat.id, field, new_value)
-    await message.answer(f"{arg}: {'✅ yoqildi' if new_value else '❌ o‘chirildi'}")
+    await _reply_privately(message, f"{arg}: {'✅ yoqildi' if new_value else '❌ o‘chirildi'}")
 
 
 def _split_words(raw: str) -> list[str]:
@@ -173,14 +217,14 @@ async def cmd_addword(message: Message, command: CommandObject):
     await _hide_command(message)
     words = _split_words(command.args)
     if not words:
-        await message.answer("Hech qanday so'z topilmadi.")
+        await _reply_privately(message, "Hech qanday so'z topilmadi.")
         return
     for w in words:
         await db.add_custom_word(message.chat.id, w)
     if len(words) == 1:
-        await message.answer(f"✅ So'z qo'shildi: {words[0]}")
+        await _reply_privately(message, f"✅ So'z qo'shildi: {words[0]}")
     else:
-        await message.answer(f"✅ {len(words)} ta so'z qo'shildi:\n" + ", ".join(words))
+        await _reply_privately(message, f"✅ {len(words)} ta so'z qo'shildi:\n" + ", ".join(words))
 
 
 @router.message(Command("removeword"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
@@ -197,14 +241,16 @@ async def cmd_removeword(message: Message, command: CommandObject):
     await _hide_command(message)
     words = _split_words(command.args)
     if not words:
-        await message.answer("Hech qanday so'z topilmadi.")
+        await _reply_privately(message, "Hech qanday so'z topilmadi.")
         return
     for w in words:
         await db.remove_custom_word(message.chat.id, w)
     if len(words) == 1:
-        await message.answer(f"✅ So'z o'chirildi: {words[0]}")
+        await _reply_privately(message, f"✅ So'z o'chirildi: {words[0]}")
     else:
-        await message.answer(f"✅ {len(words)} ta so'z ro'yxatdan o'chirildi:\n" + ", ".join(words))
+        await _reply_privately(
+            message, f"✅ {len(words)} ta so'z ro'yxatdan o'chirildi:\n" + ", ".join(words)
+        )
 
 
 @router.message(Command("listwords"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
@@ -214,9 +260,9 @@ async def cmd_listwords(message: Message):
     await _hide_command(message)
     words = await db.get_custom_words(message.chat.id)
     if not words:
-        await message.answer("Qo'shimcha taqiqlangan so'zlar hali qo'shilmagan.")
+        await _reply_privately(message, "Qo'shimcha taqiqlangan so'zlar hali qo'shilmagan.")
         return
-    await message.answer("📝 Qo'shimcha taqiqlangan so'zlar:\n" + ", ".join(words))
+    await _reply_privately(message, "📝 Qo'shimcha taqiqlangan so'zlar:\n" + ", ".join(words))
 
 
 @router.message(Command("allowbot"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
@@ -229,4 +275,4 @@ async def cmd_allowbot(message: Message, command: CommandObject):
     await _hide_command(message)
     bot_id = int(command.args.strip())
     await db.allow_bot(message.chat.id, bot_id)
-    await message.answer(f"✅ Bot ID {bot_id} endi guruhda qolishiga ruxsat berildi.")
+    await _reply_privately(message, f"✅ Bot ID {bot_id} endi guruhda qolishiga ruxsat berildi.")
