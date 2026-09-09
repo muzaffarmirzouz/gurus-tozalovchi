@@ -4,6 +4,7 @@ from aiogram import Router, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from aiogram.enums import ChatMemberStatus, ChatType
+from aiogram.exceptions import TelegramBadRequest
 
 from app import database as db
 
@@ -11,9 +12,24 @@ router = Router()
 
 
 async def _require_admin(message: Message) -> bool:
+    # Guruh nomidan (anonim admin sifatida) yozilgan xabar - Telegram bunday
+    # xabarlarni sender_chat = guruhning o'zi qilib yuboradi, from_user esa
+    # haqiqiy odam emas, maxsus "GroupAnonymousBot" bo'ladi. Bunday xabar
+    # faqat admin tomonidan yuborilishi mumkin, shuning uchun avtomatik ruxsat.
+    if message.sender_chat is not None and message.sender_chat.id == message.chat.id:
+        return True
+
     if message.from_user is None:
         return False
-    member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+
+    try:
+        member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    except TelegramBadRequest:
+        await message.answer(
+            "Adminligingizni tekshirib bo'lmadi. Iltimos, birozdan so'ng qayta urinib ko'ring."
+        )
+        return False
+
     if member.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
         await message.answer("Bu buyruqni faqat guruh adminlari ishlata oladi.")
         return False
