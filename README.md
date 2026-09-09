@@ -8,6 +8,9 @@ Telegram guruhlarni tozalovchi moderatsiya bot:
 - 🤖 Ruxsatsiz botlar guruhga qo'shilsa avtomatik chiqarib yuboradi
 - 📌 Foydalanuvchi belgilangan shaxsiy kanalga a'zo bo'lmaguncha guruhda yoza olmaydi (majburiy obuna)
 - 🔒 Botni o'z guruhiga qo'shishning o'zi ham cheklangan: `REQUIRED_CHANNEL` kanaliga a'zo bo'lmagan odam botni biror guruhga qo'shsa, bot avtomatik o'sha guruhdan chiqib ketadi
+- 📵 Telefon raqami yozilgan yoki "kontakt" sifatida ulashilgan xabarlarni o'chiradi
+- 👋 Guruhga a'zo qo'shilgani/chiqib ketgani haqidagi tizim xabarlarini yashiradi
+- 🙈 Admin yuborgan sozlash buyruqlarini (masalan `/setchannel`, `/addword`) guruh a'zolaridan yashiradi
 - Guruh adminlari filtrlardan ozod
 
 Har bir guruh o'z sozlamalariga ega (bitta bot bir nechta guruhda ishlay oladi).
@@ -87,10 +90,13 @@ python -m app.bot
 | `/setchannel @kanal` | Majburiy a'zolik kanalini belgilaydi |
 | `/unsetchannel` | Majburiy a'zolikni bekor qiladi |
 | `/settings` | Joriy sozlamalarni ko'rsatadi |
-| `/toggle swear\|links\|ads\|bots\|subscribe` | Tegishli filtrni yoqadi/o'chiradi |
-| `/addword so'z` | Qo'shimcha taqiqlangan so'z qo'shadi |
-| `/removeword so'z` | So'zni ro'yxatdan o'chiradi |
+| `/toggle swear\|links\|ads\|bots\|subscribe\|phone` | Tegishli filtrni yoqadi/o'chiradi |
+| `/addword so'z1, so'z2` | Qo'shimcha taqiqlangan so'z(lar) qo'shadi |
+| `/removeword so'z1, so'z2` | So'z(lar)ni ro'yxatdan o'chiradi |
+| `/listwords` | Qo'shimcha so'zlar ro'yxatini ko'rsatadi |
 | `/allowbot <bot_id>` | Ma'lum botga guruhda qolishga ruxsat beradi |
+
+Admin yuborgan bu buyruqlarning o'zi guruh a'zolaridan avtomatik yashiriladi (bot ularni o'chirib, faqat javobini qoldiradi).
 
 ## Eslatmalar
 

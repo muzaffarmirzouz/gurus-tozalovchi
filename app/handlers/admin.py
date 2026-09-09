@@ -36,6 +36,15 @@ async def _require_admin(message: Message) -> bool:
     return True
 
 
+async def _hide_command(message: Message):
+    """Admin yuborgan buyruq xabarini guruh a'zolaridan yashirish uchun
+    o'chiradi (faqat botning javobi ko'rinib qoladi)."""
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+
 @router.message(Command("start"), F.chat.type == ChatType.PRIVATE)
 async def cmd_start(message: Message):
     await message.answer(
@@ -46,11 +55,15 @@ async def cmd_start(message: Message):
         "/setchannel @kanal - majburiy a'zolik kanalini belgilash\n"
         "/unsetchannel - majburiy a'zolikni o'chirish\n"
         "/settings - joriy sozlamalarni ko'rish\n"
-        "/toggle swear|links|ads|bots|subscribe - filtrni yoqish/o'chirish\n"
+        "/toggle swear|links|ads|bots|subscribe|phone - filtrni yoqish/o'chirish\n"
         "/addword so'z1, so'z2 - qo'shimcha taqiqlangan so'z(lar) qo'shish\n"
         "/removeword so'z1, so'z2 - so'z(lar)ni ro'yxatdan o'chirish\n"
         "/listwords - qo'shimcha so'zlar ro'yxatini ko'rish\n"
         "/allowbot bot_id - ma'lum botga guruhda qolishga ruxsat berish\n\n"
+        "Bot avtomatik ravishda quyidagilarni ham bajaradi:\n"
+        "— guruhga a'zo qo'shilgani/chiqib ketgani haqidagi xabarlarni yashiradi\n"
+        "— admin yuborgan sozlash buyruqlarini guruh a'zolaridan yashiradi\n"
+        "— telefon raqami yozilgan yoki ulashilgan xabarlarni o'chiradi\n\n"
         "Diqqat: majburiy a'zolik ishlashi uchun meni kanalingizga ham "
         "ADMIN qilib qo'shishingiz kerak."
     )
@@ -60,6 +73,7 @@ async def cmd_start(message: Message):
 async def cmd_settings(message: Message):
     if not await _require_admin(message):
         return
+    await _hide_command(message)
     s = await db.get_chat_settings(message.chat.id)
     words = await db.get_custom_words(message.chat.id)
 
@@ -73,6 +87,7 @@ async def cmd_settings(message: Message):
         f"So'kinish filtri: {flag(s['filter_swear'])}\n"
         f"Havola (link) filtri: {flag(s['filter_links'])}\n"
         f"Reklama filtri: {flag(s['filter_ads'])}\n"
+        f"Telefon raqami filtri: {flag(s['filter_phone'])}\n"
         f"Begona botlarni bloklash: {flag(s['block_bots'])}\n"
         f"Qo'shimcha taqiqlangan so'zlar soni: {len(words)}"
     )
@@ -85,6 +100,7 @@ async def cmd_setchannel(message: Message, command: CommandObject):
     if not command.args:
         await message.answer("Foydalanish: /setchannel @kanal_username")
         return
+    await _hide_command(message)
     channel = command.args.strip()
     await db.set_required_channel(message.chat.id, channel)
     await message.answer(
@@ -98,6 +114,7 @@ async def cmd_setchannel(message: Message, command: CommandObject):
 async def cmd_unsetchannel(message: Message):
     if not await _require_admin(message):
         return
+    await _hide_command(message)
     await db.set_required_channel(message.chat.id, None)
     await message.answer("✅ Majburiy a'zolik kanali o'chirildi.")
 
@@ -108,6 +125,7 @@ _TOGGLE_MAP = {
     "ads": "filter_ads",
     "bots": "block_bots",
     "subscribe": "require_subscribe",
+    "phone": "filter_phone",
 }
 
 
@@ -118,10 +136,11 @@ async def cmd_toggle(message: Message, command: CommandObject):
     arg = (command.args or "").strip().lower()
     if arg not in _TOGGLE_MAP:
         await message.answer(
-            "Foydalanish: /toggle swear|links|ads|bots|subscribe\n"
-            "Masalan: /toggle links"
+            "Foydalanish: /toggle swear|links|ads|bots|subscribe|phone\n"
+            "Masalan: /toggle phone"
         )
         return
+    await _hide_command(message)
     field = _TOGGLE_MAP[arg]
     current = await db.get_chat_settings(message.chat.id)
     new_value = not current[field]
@@ -151,6 +170,7 @@ async def cmd_addword(message: Message, command: CommandObject):
             "/addword so'z1, so'z2, so'z3"
         )
         return
+    await _hide_command(message)
     words = _split_words(command.args)
     if not words:
         await message.answer("Hech qanday so'z topilmadi.")
@@ -174,6 +194,7 @@ async def cmd_removeword(message: Message, command: CommandObject):
             "/removeword so'z1, so'z2"
         )
         return
+    await _hide_command(message)
     words = _split_words(command.args)
     if not words:
         await message.answer("Hech qanday so'z topilmadi.")
@@ -190,6 +211,7 @@ async def cmd_removeword(message: Message, command: CommandObject):
 async def cmd_listwords(message: Message):
     if not await _require_admin(message):
         return
+    await _hide_command(message)
     words = await db.get_custom_words(message.chat.id)
     if not words:
         await message.answer("Qo'shimcha taqiqlangan so'zlar hali qo'shilmagan.")
@@ -204,6 +226,7 @@ async def cmd_allowbot(message: Message, command: CommandObject):
     if not command.args or not command.args.strip().isdigit():
         await message.answer("Foydalanish: /allowbot <bot_id>")
         return
+    await _hide_command(message)
     bot_id = int(command.args.strip())
     await db.allow_bot(message.chat.id, bot_id)
     await message.answer(f"✅ Bot ID {bot_id} endi guruhda qolishiga ruxsat berildi.")

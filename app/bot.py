@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 
 from app.config import BOT_TOKEN
 from app.database import init_db
-from app.handlers import admin, moderation, antibot, gatekeeper
+from app.handlers import admin, moderation, antibot, gatekeeper, service
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,6 +20,7 @@ async def main():
 
     dp.include_router(admin.router)
     dp.include_router(gatekeeper.router)
+    dp.include_router(service.router)
     dp.include_router(antibot.router)
     dp.include_router(moderation.router)
 

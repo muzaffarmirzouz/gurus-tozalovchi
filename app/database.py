@@ -17,10 +17,17 @@ async def init_db():
             filter_links INTEGER NOT NULL DEFAULT 1,
             filter_ads INTEGER NOT NULL DEFAULT 1,
             block_bots INTEGER NOT NULL DEFAULT 1,
-            require_subscribe INTEGER NOT NULL DEFAULT 1
+            require_subscribe INTEGER NOT NULL DEFAULT 1,
+            filter_phone INTEGER NOT NULL DEFAULT 1
         )
         """
     )
+    # Eski (allaqachon yaratilgan) bazalarga yangi ustunni qo'shib qo'yamiz -
+    # CREATE TABLE IF NOT EXISTS mavjud jadvalga yangi ustun qo'shmaydi.
+    try:
+        await _db.execute("ALTER TABLE chats ADD COLUMN filter_phone INTEGER NOT NULL DEFAULT 1")
+    except Exception:
+        pass  # ustun allaqachon mavjud
     await _db.execute(
         """
         CREATE TABLE IF NOT EXISTS admins (
@@ -67,7 +74,7 @@ async def ensure_chat(chat_id: int):
 async def get_chat_settings(chat_id: int) -> dict:
     await ensure_chat(chat_id)
     cur = await db().execute(
-        "SELECT required_channel, filter_swear, filter_links, filter_ads, block_bots, require_subscribe "
+        "SELECT required_channel, filter_swear, filter_links, filter_ads, block_bots, require_subscribe, filter_phone "
         "FROM chats WHERE chat_id = ?",
         (chat_id,),
     )
@@ -79,6 +86,7 @@ async def get_chat_settings(chat_id: int) -> dict:
         "filter_ads": bool(row[3]),
         "block_bots": bool(row[4]),
         "require_subscribe": bool(row[5]),
+        "filter_phone": bool(row[6]),
     }
 
 
@@ -91,7 +99,7 @@ async def set_required_channel(chat_id: int, channel: str | None):
 
 
 async def toggle_setting(chat_id: int, field: str, value: bool):
-    assert field in {"filter_swear", "filter_links", "filter_ads", "block_bots", "require_subscribe"}
+    assert field in {"filter_swear", "filter_links", "filter_ads", "block_bots", "require_subscribe", "filter_phone"}
     await ensure_chat(chat_id)
     await db().execute(
         f"UPDATE chats SET {field} = ? WHERE chat_id = ?", (int(value), chat_id)

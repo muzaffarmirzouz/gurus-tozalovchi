@@ -9,6 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from app import database as db
 from app.filters.badwords import contains_bad_word
 from app.filters.links_ads import has_link, looks_like_ad
+from app.filters.phone import has_phone_number
 
 router = Router()
 
@@ -115,6 +116,19 @@ async def moderate_message(message: Message):
             pass
         await message.answer(
             f"🚫 {message.from_user.mention_html()}, guruhda havola (link) "
+            f"yuborish taqiqlangan.",
+            parse_mode="HTML",
+        )
+        return
+
+    # 5) Telefon raqami filtri (matnda yozilgan raqam yoki "kontakt" ulashish)
+    if settings["filter_phone"] and (message.contact is not None or (text and has_phone_number(text))):
+        try:
+            await message.delete()
+        except TelegramBadRequest:
+            pass
+        await message.answer(
+            f"🚫 {message.from_user.mention_html()}, guruhda telefon raqami "
             f"yuborish taqiqlangan.",
             parse_mode="HTML",
         )
