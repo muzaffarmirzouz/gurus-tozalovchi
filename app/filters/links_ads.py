@@ -16,6 +16,12 @@ AD_KEYWORDS = [
     "бесплатно", "казино", "casino", "ставки", "ставка", "1xbet",
     "crypto", "kripto", "investitsiya", "investitsiya qiling",
     "работа на дому", "удаленная работа", "доход от",
+    # 18+ / intim xizmat reklamasi (soxta profillar orqali tarqatiladigan spam)
+    "18+", "интим", "интим услуги", "индивидуалка", "индивидуалки",
+    "проститутки", "путана", "путаны", "vip xizmat", "vip usluga",
+    "eskort xizmati", "escort", "досуг", "снять девушку", "интимные услуги",
+    "intim xizmat", "yolg'iz ayollar", "мои услуги", "приватные видео",
+    "приват видео", "webcam", "вебкам", "onlyfans",
 ]
 
 
