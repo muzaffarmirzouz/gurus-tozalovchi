@@ -7,6 +7,7 @@ Telegram guruhlarni tozalovchi moderatsiya bot:
 - 📢 Reklama xabarlarini aniqlab o'chiradi
 - 🤖 Ruxsatsiz botlar guruhga qo'shilsa avtomatik chiqarib yuboradi
 - 📌 Foydalanuvchi belgilangan shaxsiy kanalga a'zo bo'lmaguncha guruhda yoza olmaydi (majburiy obuna)
+- 🔒 Botni o'z guruhiga qo'shishning o'zi ham cheklangan: `REQUIRED_CHANNEL` kanaliga a'zo bo'lmagan odam botni biror guruhga qo'shsa, bot avtomatik o'sha guruhdan chiqib ketadi
 - Guruh adminlari filtrlardan ozod
 
 Har bir guruh o'z sozlamalariga ega (bitta bot bir nechta guruhda ishlay oladi).
@@ -32,8 +33,17 @@ OWNER_ID=sizning_telegram_id'ingiz
 DB_PATH=bot.db
 ```
 
-`REQUIRED_CHANNEL`ni keyinroq guruh ichida `/setchannel @kanal` buyrug'i
-bilan ham o'rnatish/o'zgartirish mumkin.
+`REQUIRED_CHANNEL` ikkita vazifani bajaradi:
+1. **Botni guruhga qo'shish sharti**: kimdir botni biror guruhga qo'shsa,
+   bot avval o'sha odamning `REQUIRED_CHANNEL`ga a'zoligini tekshiradi —
+   a'zo bo'lmasa, ogohlantirib guruhdan avtomatik chiqib ketadi.
+2. Har bir guruh ichida `/setchannel @kanal` buyrug'i bilan **o'sha
+   guruhning o'z majburiy a'zolik kanali** alohida belgilanadi (guruh
+   a'zolari yozish uchun qaysi kanalga obuna bo'lishi kerakligini
+   bildiradi) — bu `.env`dagi `REQUIRED_CHANNEL`dan mustaqil ishlaydi.
+
+Har ikkala holatda ham bot tegishli kanalga **admin** qilib qo'shilgan
+bo'lishi shart, aks holda a'zolikni tekshira olmaydi.
 
 ## 3. Botni guruhga va kanalga qo'shish
 
