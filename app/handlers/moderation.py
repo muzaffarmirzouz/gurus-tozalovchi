@@ -41,6 +41,15 @@ async def _is_subscribed(bot, channel: str, user_id: int) -> bool:
 
 @router.message(F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
 async def moderate_message(message: Message):
+    # Ulangan kanaldan izoh guruhiga avtomatik tushgan post (channel post
+    # discussion guruhga nusxalanganda) - bunday xabarlar filtrlanmasligi
+    # kerak, chunki bu kanalning o'z posti, guruh a'zosining yozgani emas.
+    if message.is_automatic_forward:
+        return
+    if message.sender_chat is not None and message.sender_chat.id != message.chat.id:
+        # Guruh nomidan emas, boshqa (ulangan) kanal nomidan kelgan xabar
+        return
+
     if message.from_user is None or message.from_user.is_bot:
         return
 
