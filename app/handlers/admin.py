@@ -47,8 +47,9 @@ async def cmd_start(message: Message):
         "/unsetchannel - majburiy a'zolikni o'chirish\n"
         "/settings - joriy sozlamalarni ko'rish\n"
         "/toggle swear|links|ads|bots|subscribe - filtrni yoqish/o'chirish\n"
-        "/addword so'z - qo'shimcha taqiqlangan so'z qo'shish\n"
-        "/removeword so'z - so'zni ro'yxatdan o'chirish\n"
+        "/addword so'z1, so'z2 - qo'shimcha taqiqlangan so'z(lar) qo'shish\n"
+        "/removeword so'z1, so'z2 - so'z(lar)ni ro'yxatdan o'chirish\n"
+        "/listwords - qo'shimcha so'zlar ro'yxatini ko'rish\n"
         "/allowbot bot_id - ma'lum botga guruhda qolishga ruxsat berish\n\n"
         "Diqqat: majburiy a'zolik ishlashi uchun meni kanalingizga ham "
         "ADMIN qilib qo'shishingiz kerak."
@@ -128,15 +129,38 @@ async def cmd_toggle(message: Message, command: CommandObject):
     await message.answer(f"{arg}: {'✅ yoqildi' if new_value else '❌ o‘chirildi'}")
 
 
+def _split_words(raw: str) -> list[str]:
+    """So'zlarni vergul yoki qator (yangi satr) bilan ajratib beradi,
+    bo'sh elementlarni tashlab yuboradi. Vergul yo'q bo'lsa butun matnni
+    bitta ibora sifatida qaytaradi (masalan ko'p so'zli haqorat)."""
+    raw = raw.strip()
+    if "," in raw or "\n" in raw:
+        parts = raw.replace("\n", ",").split(",")
+        return [p.strip() for p in parts if p.strip()]
+    return [raw] if raw else []
+
+
 @router.message(Command("addword"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
 async def cmd_addword(message: Message, command: CommandObject):
     if not await _require_admin(message):
         return
     if not command.args:
-        await message.answer("Foydalanish: /addword so'z")
+        await message.answer(
+            "Foydalanish: /addword so'z\n"
+            "Bir nechtasini qo'shish uchun vergul bilan ajrating:\n"
+            "/addword so'z1, so'z2, so'z3"
+        )
         return
-    await db.add_custom_word(message.chat.id, command.args.strip())
-    await message.answer("✅ So'z qo'shildi.")
+    words = _split_words(command.args)
+    if not words:
+        await message.answer("Hech qanday so'z topilmadi.")
+        return
+    for w in words:
+        await db.add_custom_word(message.chat.id, w)
+    if len(words) == 1:
+        await message.answer(f"✅ So'z qo'shildi: {words[0]}")
+    else:
+        await message.answer(f"✅ {len(words)} ta so'z qo'shildi:\n" + ", ".join(words))
 
 
 @router.message(Command("removeword"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
@@ -144,10 +168,33 @@ async def cmd_removeword(message: Message, command: CommandObject):
     if not await _require_admin(message):
         return
     if not command.args:
-        await message.answer("Foydalanish: /removeword so'z")
+        await message.answer(
+            "Foydalanish: /removeword so'z\n"
+            "Bir nechtasini o'chirish uchun vergul bilan ajrating:\n"
+            "/removeword so'z1, so'z2"
+        )
         return
-    await db.remove_custom_word(message.chat.id, command.args.strip())
-    await message.answer("✅ So'z ro'yxatdan o'chirildi.")
+    words = _split_words(command.args)
+    if not words:
+        await message.answer("Hech qanday so'z topilmadi.")
+        return
+    for w in words:
+        await db.remove_custom_word(message.chat.id, w)
+    if len(words) == 1:
+        await message.answer(f"✅ So'z o'chirildi: {words[0]}")
+    else:
+        await message.answer(f"✅ {len(words)} ta so'z ro'yxatdan o'chirildi:\n" + ", ".join(words))
+
+
+@router.message(Command("listwords"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
+async def cmd_listwords(message: Message):
+    if not await _require_admin(message):
+        return
+    words = await db.get_custom_words(message.chat.id)
+    if not words:
+        await message.answer("Qo'shimcha taqiqlangan so'zlar hali qo'shilmagan.")
+        return
+    await message.answer("📝 Qo'shimcha taqiqlangan so'zlar:\n" + ", ".join(words))
 
 
 @router.message(Command("allowbot"), F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}))
